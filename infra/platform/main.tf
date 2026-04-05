@@ -17,8 +17,8 @@ module "security_groups" {
 }
 
 module "service_accounts" {
-  source   = "./modules/service-accounts"
-  folder_id = var.yc_folder_id
+  source               = "./modules/service-accounts"
+  folder_id            = var.yc_folder_id
   service_account_name = "${var.cluster_name}-sa"
   service_account_roles = [
     "k8s.clusters.agent",

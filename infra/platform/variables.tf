@@ -69,7 +69,7 @@ variable "cluster_name" {
 variable "cluster_description" {
   description = "Managed Kubernetes cluster description"
   type        = string
-  default     = "Managed Kubernetes cluster for Netology diploma"
+  default     = "Managed Kubernetes cluster for Netology diploma - CI workflow update check"
 }
 
 variable "cluster_version" {
@@ -93,7 +93,7 @@ variable "node_group_name" {
 variable "node_group_description" {
   description = "Kubernetes node group description"
   type        = string
-  default     = "Preemptible worker nodes for Netology diploma"
+  default     = "Preemptible worker nodes for Netology diploma - updated via GitHub Actions"
 }
 
 variable "create_node_group" {

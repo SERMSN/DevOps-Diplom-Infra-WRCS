@@ -10,7 +10,6 @@ env:
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
   TF_STATE_OBJECT_KEY: infrastructure/terraform.tfstate
-  TF_SERVICE_ACCOUNT_NAME: tf-sa
   NETWORK_NAME: netology-diplom-network
   REGISTRY_NAME: netology-diplom-registry
   KMS_KEY_NAME: netology-diplom-kms-key
@@ -61,64 +60,34 @@ jobs:
           YC_CLOUD_ID: ${{ secrets.YC_CLOUD_ID }}
           YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
           YC_TF_STATE_BUCKET_NAME: ${{ secrets.YC_TF_STATE_BUCKET_NAME }}
+          YC_S3_ACCESS_KEY: ${{ secrets.YC_S3_ACCESS_KEY }}
+          YC_S3_SECRET_KEY: ${{ secrets.YC_S3_SECRET_KEY }}
         run: |
           test -n "$YC_TOKEN"
           test -n "$YC_CLOUD_ID"
           test -n "$YC_FOLDER_ID"
           test -n "$YC_TF_STATE_BUCKET_NAME"
+          test -n "$YC_S3_ACCESS_KEY"
+          test -n "$YC_S3_SECRET_KEY"
 
-      - name: Generate bootstrap tfvars
+      - name: Render backend from GitHub secrets
         shell: bash
         env:
-          YC_TOKEN: ${{ secrets.YC_TOKEN }}
-          YC_CLOUD_ID: ${{ secrets.YC_CLOUD_ID }}
-          YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
           YC_TF_STATE_BUCKET_NAME: ${{ secrets.YC_TF_STATE_BUCKET_NAME }}
+          YC_S3_ACCESS_KEY: ${{ secrets.YC_S3_ACCESS_KEY }}
+          YC_S3_SECRET_KEY: ${{ secrets.YC_S3_SECRET_KEY }}
         run: |
-          cat > infra/bootstrap/terraform.tfvars <<EOF
-          yc_token                = "${YC_TOKEN}"
-          yc_cloud_id             = "${YC_CLOUD_ID}"
-          yc_folder_id            = "${YC_FOLDER_ID}"
-          yc_zone                 = "ru-central1-a"
-          tf_state_bucket_name    = "${YC_TF_STATE_BUCKET_NAME}"
-          tf_service_account_name = "${TF_SERVICE_ACCOUNT_NAME}"
-          tf_state_object_key     = "${TF_STATE_OBJECT_KEY}"
-          EOF
-
-      - name: Terraform bootstrap fmt and validate
-        shell: bash
-        working-directory: infra/bootstrap
-        run: |
-          terraform fmt -check
-          terraform init
-          terraform validate
-
-      - name: Terraform bootstrap apply
-        shell: bash
-        working-directory: infra/bootstrap
-        run: terraform apply -auto-approve
-
-      - name: Render backend from bootstrap outputs
-        id: backend
-        shell: bash
-        working-directory: infra/bootstrap
-        run: |
-          ACCESS_KEY="$(terraform output -raw tf_state_access_key)"
-          SECRET_KEY="$(terraform output -raw tf_state_secret_key)"
-          BUCKET_NAME="$(terraform output -raw tf_state_bucket_name)"
-          OBJECT_KEY="$(terraform output -raw tf_state_backend_key)"
-
-          cat > ../platform/backend.tf <<EOF
+          cat > infra/platform/backend.tf <<EOF
           terraform {
             backend "s3" {
               endpoints = {
                 s3 = "https://storage.yandexcloud.net"
               }
-              bucket                      = "${BUCKET_NAME}"
-              key                         = "${OBJECT_KEY}"
+              bucket                      = "${YC_TF_STATE_BUCKET_NAME}"
+              key                         = "${TF_STATE_OBJECT_KEY}"
               region                      = "ru-central1"
-              access_key                  = "${ACCESS_KEY}"
-              secret_key                  = "${SECRET_KEY}"
+              access_key                  = "${YC_S3_ACCESS_KEY}"
+              secret_key                  = "${YC_S3_SECRET_KEY}"
               skip_region_validation      = true
               skip_credentials_validation = true
               skip_requesting_account_id  = true
@@ -146,6 +115,12 @@ jobs:
           node_group_name   = "${NODE_GROUP_NAME}"
           create_node_group = ${CREATE_NODE_GROUP}
           EOF
+
+      - name: Bootstrap note
+        shell: bash
+        run: |
+          echo "Bootstrap is expected to be created once manually."
+          echo "This workflow manages the platform stack using the existing remote backend."
 
       - name: Terraform platform fmt and validate
         shell: bash

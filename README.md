@@ -64,6 +64,14 @@ Values-файл для установки monitoring stack.
 - `YC_CLOUD_ID`
 - `YC_FOLDER_ID`
 - `YC_TF_STATE_BUCKET_NAME`
+- `YC_S3_ACCESS_KEY`
+- `YC_S3_SECRET_KEY`
+
+## Important Workflow Note
+
+`bootstrap` не должен выполняться в GitHub Actions на каждом коммите.  
+Его нужно создать один раз вручную, а workflow управляет только `platform`
+через уже существующий remote backend.
 
 ## GitHub Repository Role
 

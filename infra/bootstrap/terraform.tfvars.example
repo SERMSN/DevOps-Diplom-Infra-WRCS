@@ -1,0 +1,7 @@
+yc_token             = "replace-me"
+yc_cloud_id          = "replace-me"
+yc_folder_id         = "replace-me"
+yc_zone              = "ru-central1-a"
+tf_state_bucket_name = "replace-me"
+tf_service_account_name = "tf-sa"
+tf_state_object_key  = "infrastructure/terraform.tfstate"

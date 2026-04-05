@@ -1,0 +1,11 @@
+yc_token     = "replace-me"
+yc_cloud_id  = "replace-me"
+yc_folder_id = "replace-me"
+yc_zone      = "ru-central1-a"
+
+network_name = "netology-diplom-network"
+registry_name = "netology-diplom-registry"
+kms_key_name  = "netology-diplom-kms-key"
+cluster_name  = "netology-diplom-cluster"
+node_group_name = "netology-diplom-nodes"
+create_node_group = true

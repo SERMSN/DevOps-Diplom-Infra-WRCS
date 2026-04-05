@@ -1,0 +1,166 @@
+name: Infra Terraform
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  TF_STATE_OBJECT_KEY: infrastructure/terraform.tfstate
+  TF_SERVICE_ACCOUNT_NAME: tf-sa
+  NETWORK_NAME: netology-diplom-network
+  REGISTRY_NAME: netology-diplom-registry
+  KMS_KEY_NAME: netology-diplom-kms-key
+  CLUSTER_NAME: netology-diplom-cluster
+  NODE_GROUP_NAME: netology-diplom-nodes
+  CREATE_NODE_GROUP: "true"
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Install Yandex Cloud CLI
+        shell: bash
+        run: |
+          curl -fsSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | \
+            bash -s -- -i "$HOME/yandex-cloud" -n
+          echo "$HOME/yandex-cloud/bin" >> "$GITHUB_PATH"
+
+      - name: Configure Yandex Cloud
+        shell: bash
+        env:
+          YC_TOKEN: ${{ secrets.YC_TOKEN }}
+          YC_CLOUD_ID: ${{ secrets.YC_CLOUD_ID }}
+          YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+        run: |
+          test -n "$YC_TOKEN"
+          test -n "$YC_CLOUD_ID"
+          test -n "$YC_FOLDER_ID"
+          yc config set token "$YC_TOKEN"
+          yc config set cloud-id "$YC_CLOUD_ID"
+          yc config set folder-id "$YC_FOLDER_ID"
+          yc iam create-token >/dev/null
+
+      - name: Validate required secrets
+        shell: bash
+        env:
+          YC_TOKEN: ${{ secrets.YC_TOKEN }}
+          YC_CLOUD_ID: ${{ secrets.YC_CLOUD_ID }}
+          YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+          YC_TF_STATE_BUCKET_NAME: ${{ secrets.YC_TF_STATE_BUCKET_NAME }}
+        run: |
+          test -n "$YC_TOKEN"
+          test -n "$YC_CLOUD_ID"
+          test -n "$YC_FOLDER_ID"
+          test -n "$YC_TF_STATE_BUCKET_NAME"
+
+      - name: Generate bootstrap tfvars
+        shell: bash
+        env:
+          YC_TOKEN: ${{ secrets.YC_TOKEN }}
+          YC_CLOUD_ID: ${{ secrets.YC_CLOUD_ID }}
+          YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+          YC_TF_STATE_BUCKET_NAME: ${{ secrets.YC_TF_STATE_BUCKET_NAME }}
+        run: |
+          cat > infra/bootstrap/terraform.tfvars <<EOF
+          yc_token                = "${YC_TOKEN}"
+          yc_cloud_id             = "${YC_CLOUD_ID}"
+          yc_folder_id            = "${YC_FOLDER_ID}"
+          yc_zone                 = "ru-central1-a"
+          tf_state_bucket_name    = "${YC_TF_STATE_BUCKET_NAME}"
+          tf_service_account_name = "${TF_SERVICE_ACCOUNT_NAME}"
+          tf_state_object_key     = "${TF_STATE_OBJECT_KEY}"
+          EOF
+
+      - name: Terraform bootstrap fmt and validate
+        shell: bash
+        working-directory: infra/bootstrap
+        run: |
+          terraform fmt -check
+          terraform init
+          terraform validate
+
+      - name: Terraform bootstrap apply
+        shell: bash
+        working-directory: infra/bootstrap
+        run: terraform apply -auto-approve
+
+      - name: Render backend from bootstrap outputs
+        id: backend
+        shell: bash
+        working-directory: infra/bootstrap
+        run: |
+          ACCESS_KEY="$(terraform output -raw tf_state_access_key)"
+          SECRET_KEY="$(terraform output -raw tf_state_secret_key)"
+          BUCKET_NAME="$(terraform output -raw tf_state_bucket_name)"
+          OBJECT_KEY="$(terraform output -raw tf_state_backend_key)"
+
+          cat > ../platform/backend.tf <<EOF
+          terraform {
+            backend "s3" {
+              endpoints = {
+                s3 = "https://storage.yandexcloud.net"
+              }
+              bucket                      = "${BUCKET_NAME}"
+              key                         = "${OBJECT_KEY}"
+              region                      = "ru-central1"
+              access_key                  = "${ACCESS_KEY}"
+              secret_key                  = "${SECRET_KEY}"
+              skip_region_validation      = true
+              skip_credentials_validation = true
+              skip_requesting_account_id  = true
+              skip_s3_checksum            = true
+            }
+          }
+          EOF
+
+      - name: Generate platform tfvars
+        shell: bash
+        env:
+          YC_TOKEN: ${{ secrets.YC_TOKEN }}
+          YC_CLOUD_ID: ${{ secrets.YC_CLOUD_ID }}
+          YC_FOLDER_ID: ${{ secrets.YC_FOLDER_ID }}
+        run: |
+          cat > infra/platform/terraform.tfvars <<EOF
+          yc_token          = "${YC_TOKEN}"
+          yc_cloud_id       = "${YC_CLOUD_ID}"
+          yc_folder_id      = "${YC_FOLDER_ID}"
+          yc_zone           = "ru-central1-a"
+          network_name      = "${NETWORK_NAME}"
+          registry_name     = "${REGISTRY_NAME}"
+          kms_key_name      = "${KMS_KEY_NAME}"
+          cluster_name      = "${CLUSTER_NAME}"
+          node_group_name   = "${NODE_GROUP_NAME}"
+          create_node_group = ${CREATE_NODE_GROUP}
+          EOF
+
+      - name: Terraform platform fmt and validate
+        shell: bash
+        working-directory: infra/platform
+        run: |
+          terraform fmt -check
+          terraform init -reconfigure
+          terraform validate
+
+      - name: Terraform platform plan
+        shell: bash
+        working-directory: infra/platform
+        run: terraform plan -out=tfplan
+
+      - name: Terraform platform apply
+        shell: bash
+        working-directory: infra/platform
+        run: terraform apply -auto-approve tfplan

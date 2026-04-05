@@ -56,6 +56,15 @@ Values-файл для установки monitoring stack.
 - Локальные `terraform.tfvars` и `terraform.tfstate` не должны попадать в git.
 - Перед запуском скриптов нужно проверить актуальный `yc` token.
 
+## GitHub Actions Secrets
+
+Для полного Terraform pipeline в GitHub Actions нужны secrets:
+
+- `YC_TOKEN`
+- `YC_CLOUD_ID`
+- `YC_FOLDER_ID`
+- `YC_TF_STATE_BUCKET_NAME`
+
 ## GitHub Repository Role
 
 Этот репозиторий должен быть отдельным GitHub repo для инфраструктуры диплома.  

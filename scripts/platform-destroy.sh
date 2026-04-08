@@ -3,7 +3,6 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BOOTSTRAP_DIR="$ROOT_DIR/infra/bootstrap"
 PLATFORM_DIR="$ROOT_DIR/infra/platform"
 
 RED="$(printf '\033[31m')"
@@ -38,22 +37,37 @@ have_cmd() {
   command -v "$1" >/dev/null 2>&1
 }
 
-confirm() {
-  local answer
-  read -r -p "$1 [y/N]: " answer
-  [[ "$answer" == "y" || "$answer" == "Y" ]]
+retry() {
+  local attempts="$1"
+  local delay="$2"
+  shift 2
+
+  local try=1
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+
+    if (( try >= attempts )); then
+      return 1
+    fi
+
+    info "Command failed. Retry ${try}/${attempts} after ${delay}s: $*"
+    sleep "$delay"
+    try=$((try + 1))
+  done
 }
 
 cleanup_registry_images() {
   local registry_id image_ids raw_json
 
   cd "$PLATFORM_DIR"
-  if ! terraform init -reconfigure >/dev/null 2>&1; then
+  if ! retry 3 10 terraform init -reconfigure >/dev/null 2>&1; then
     info "Platform backend is unavailable or already removed, skipping registry cleanup"
     return 0
   fi
-  registry_id="$(terraform output -raw registry_id 2>/dev/null || true)"
 
+  registry_id="$(terraform output -raw registry_id 2>/dev/null || true)"
   if [[ -z "$registry_id" ]]; then
     info "Registry ID not found in platform outputs, skipping image cleanup"
     return 0
@@ -71,7 +85,6 @@ cleanup_registry_images() {
     image_ids="$(python3 - <<'PY' <<<"$raw_json"
 import json
 import sys
-
 data = json.load(sys.stdin)
 for item in data:
     image_id = item.get("id")
@@ -103,11 +116,6 @@ require_cmd helm
 require_cmd yc
 require_cmd sed
 
-if ! confirm "This will destroy all diploma resources in Yandex Cloud, including bootstrap. Continue?"; then
-  echo "Cancelled."
-  exit 0
-fi
-
 step "Checking yc authentication"
 yc iam create-token >/dev/null || fail "yc authentication failed. Refresh your OAuth token with 'yc config set token ...'"
 success "yc authentication is valid"
@@ -126,20 +134,9 @@ cleanup_registry_images
 
 step "Destroying platform stack"
 cd "$PLATFORM_DIR"
-if terraform init -reconfigure >/dev/null 2>&1; then
-  if terraform destroy -auto-approve; then
-    success "Platform stack destroyed"
-  else
-    info "Platform destroy did not complete cleanly, continuing with bootstrap cleanup"
-  fi
+if retry 3 10 terraform init -reconfigure >/dev/null 2>&1; then
+  retry 3 10 terraform destroy -auto-approve
+  success "Platform stack destroyed"
 else
   info "Platform backend is unavailable or already removed, skipping platform destroy"
 fi
-
-step "Destroying bootstrap stack"
-cd "$BOOTSTRAP_DIR"
-terraform init
-terraform destroy -auto-approve
-success "Bootstrap stack destroyed"
-
-printf '\n%sDestroy complete%s\n' "$BOLD" "$RESET"

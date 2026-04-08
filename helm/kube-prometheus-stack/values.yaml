@@ -4,7 +4,7 @@ grafana:
     enabled: true
     ingressClassName: nginx
     hosts:
-      - grafana.158.160.203.226.nip.io
+      - __GRAFANA_HOST__
     path: /
     pathType: Prefix
   resources:

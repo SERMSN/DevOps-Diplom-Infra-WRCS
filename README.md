@@ -11,14 +11,12 @@
 
 ## Purpose
 
-Этот репозиторий отвечает за:
+Этот репозиторий отвечает за инфраструктуру:
 
 - `Terraform bootstrap`
 - `Terraform platform`
 - `Managed Kubernetes`
-- `Ingress NGINX`
-- `kube-prometheus-stack`
-- автоматизацию `destroy` и `redeploy`
+- инфраструктурную автоматизацию `destroy` и `redeploy`
 
 ## Main Directories
 
@@ -48,8 +46,8 @@ Values-файл для установки monitoring stack.
 
 ### `scripts`
 
-- `destroy-all.sh`
-- `redeploy-current-state.sh`
+- `redeploy-current-state.sh` - applies `bootstrap` then `platform`
+- `destroy-all.sh` - destroys `platform` then `bootstrap`
 
 ## Notes
 
@@ -80,8 +78,8 @@ Values-файл для установки monitoring stack.
 
 ## Workflow Check
 
-Этот коммит можно использовать как безопасную проверку `GitHub Actions` для infra-репозитория:
+Проверка `GitHub Actions` для infra-репозитория:
 
-- workflow должен стартовать автоматически по push в `master`
-- bootstrap и platform должны пройти `fmt`, `validate`, `plan`, `apply`
-- если инфраструктура уже существует, `apply` должен быть идемпотентным
+- workflow стартует автоматически по push в `master`
+- выполняются `fmt`, `validate`, `plan`, `apply` для `platform`
+- при уже созданной инфраструктуре `apply` должен быть идемпотентным

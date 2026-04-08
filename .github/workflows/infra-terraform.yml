@@ -34,8 +34,18 @@ jobs:
       - name: Install Yandex Cloud CLI
         shell: bash
         run: |
-          curl -fsSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | \
-            bash -s -- -i "$HOME/yandex-cloud" -n
+          for i in 1 2 3; do
+            if curl -fsSL --retry 5 --retry-delay 3 --retry-all-errors \
+              https://storage.yandexcloud.net/yandexcloud-yc/install.sh | \
+              bash -s -- -i "$HOME/yandex-cloud" -n; then
+              break
+            fi
+            if [[ "$i" -eq 3 ]]; then
+              echo "Failed to install yc CLI after 3 attempts" >&2
+              exit 1
+            fi
+            sleep 10
+          done
           echo "$HOME/yandex-cloud/bin" >> "$GITHUB_PATH"
 
       - name: Configure Yandex Cloud

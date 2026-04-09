@@ -69,7 +69,7 @@ variable "cluster_name" {
 variable "cluster_description" {
   description = "Managed Kubernetes cluster description"
   type        = string
-  default     = "Managed Kubernetes cluster for Netology diploma WRCS"
+  default     = "Managed Kubernetes cluster for Netology diploma WRCS-TEST"
 }
 
 variable "cluster_version" {

@@ -61,7 +61,7 @@ variable "kms_key_name" {
 }
 
 variable "cluster_name" {
-  description = "Managed Kubernetes cluster name"
+  description = "Managed Kubernetes cluster name TEST"
   type        = string
   default     = "netology-diplom-cluster"
 }
@@ -69,7 +69,7 @@ variable "cluster_name" {
 variable "cluster_description" {
   description = "Managed Kubernetes cluster description"
   type        = string
-  default     = "Managed Kubernetes cluster for Netology diploma"
+  default     = "Managed Kubernetes cluster for Netology diploma TEST"
 }
 
 variable "cluster_version" {
